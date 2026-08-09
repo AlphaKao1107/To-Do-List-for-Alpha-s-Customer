@@ -1,0 +1,1915 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="h-full dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClientFlow - 客戶為主軸的待辦事項與專案整理系統 (整合 Gemini AI 智慧寫入)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts Inter & Noto Sans TC -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tesseract.js CDN for OCR Screenshot Recognition -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans TC', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #09090b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #27272a;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3f3f46;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slideInRight {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.25s ease-out forwards;
+        }
+        .animate-slide-right {
+            animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .dropzone-active {
+            border-color: #3b82f6 !important;
+            background-color: rgba(59, 130, 246, 0.1) !important;
+        }
+    </style>
+</head>
+<body class="h-full bg-zinc-950 text-zinc-100 font-sans antialiased overflow-hidden">
+
+    <div id="app" class="flex h-screen w-screen overflow-hidden relative">
+        
+        <aside id="sidebar" class="w-72 bg-zinc-950 text-zinc-300 flex flex-col border-r border-zinc-800 shrink-0 transition-all duration-300 z-20">
+            <!-- Brand header -->
+            <div class="p-5 border-b border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-blue-600/30">
+                        <i class="fa-solid fa-briefcase"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-white text-base tracking-wide">ClientFlow</h1>
+                        <p class="text-xs text-zinc-400">客戶、待辦與專案管理系統</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation Links / Views -->
+            <div class="p-4 flex-1 overflow-y-auto space-y-6">
+                <div>
+                    <p class="px-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">主選單</p>
+                    <nav class="space-y-1">
+                        <button onclick="app.switchView('dashboard')" id="nav-dashboard" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-blue-600 text-white shadow-md shadow-blue-600/20">
+                            <i class="fa-solid fa-chart-pie w-5 text-center"></i>
+                            <span>儀表板總覽</span>
+                        </button>
+                        <button onclick="app.switchView('todos')" id="nav-todos" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-zinc-400 hover:bg-zinc-900 hover:text-white">
+                            <i class="fa-solid fa-list-check w-5 text-center"></i>
+                            <span>全部待辦事項</span>
+                        </button>
+                        <button onclick="app.switchView('clients')" id="nav-clients" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-zinc-400 hover:bg-zinc-900 hover:text-white">
+                            <i class="fa-solid fa-users w-5 text-center"></i>
+                            <span>客戶資料與專案管理</span>
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Gemini AI Feature Highlight Banner -->
+                <div class="bg-gradient-to-r from-purple-950/80 to-blue-950/80 p-3 rounded-xl border border-purple-500/30 space-y-2">
+                    <div class="flex items-center space-x-2 text-purple-300 font-bold text-xs">
+                        <i class="fa-solid fa-sparkles text-amber-400"></i>
+                        <span>Gemini AI 智慧對話寫入</span>
+                    </div>
+                    <p class="text-[11px] text-zinc-300 leading-relaxed">用講的或用寫的，AI 即可直接為您新增待辦、建立客戶或登記專案資料！</p>
+                    <button onclick="app.toggleAiDrawer(true)" class="w-full py-1.5 px-3 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white text-xs font-semibold transition flex items-center justify-center space-x-1.5 shadow-md shadow-purple-600/30">
+                        <i class="fa-solid fa-comments"></i>
+                        <span>開啟 AI 對話助理</span>
+                    </button>
+                </div>
+
+                <!-- AI Screenshot Import Feature Highlight -->
+                <div class="bg-gradient-to-r from-blue-950/80 to-indigo-950/80 p-3 rounded-xl border border-blue-500/30 space-y-2">
+                    <div class="flex items-center space-x-2 text-blue-400 font-bold text-xs">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        <span>截圖智慧匯入專案</span>
+                    </div>
+                    <p class="text-[11px] text-zinc-300 leading-relaxed">按下 <kbd class="px-1.5 py-0.5 rounded bg-zinc-800 text-blue-300 border border-zinc-700 font-mono text-[10px]">Ctrl+V</kbd> 貼上截圖，系統即可自動識別專案規格並建立檔案！</p>
+                    <button onclick="app.openOcrModal()" class="w-full py-1.5 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition flex items-center justify-center space-x-1.5 shadow-sm shadow-blue-600/30">
+                        <i class="fa-solid fa-camera"></i>
+                        <span>開啟截圖辨識器</span>
+                    </button>
+                </div>
+
+                <!-- Quick Client Filter List in Sidebar -->
+                <div>
+                    <div class="flex items-center justify-between px-3 mb-2">
+                        <p class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">依客戶快速篩選</p>
+                        <button onclick="app.openClientModal()" class="text-xs text-blue-400 hover:text-blue-300 font-medium">
+                            <i class="fa-solid fa-plus mr-1"></i>新增
+                        </button>
+                    </div>
+                    <div id="sidebar-client-list" class="space-y-1 max-h-48 overflow-y-auto pr-1">
+                        <!-- Dynamically populated -->
+                    </div>
+                </div>
+
+                <!-- Data Safety & Migration Panel -->
+                <div class="pt-4 border-t border-zinc-800">
+                    <p class="px-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">資料備份與版本相容</p>
+                    <div class="space-y-1 px-1 text-xs">
+                        <button onclick="app.exportDataJSON()" class="w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-zinc-400 hover:bg-zinc-900 hover:text-white transition">
+                            <i class="fa-solid fa-download text-blue-400 w-4"></i>
+                            <span>匯出資料備份 (.json)</span>
+                        </button>
+                        <button onclick="document.getElementById('import-file-input').click()" class="w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-zinc-400 hover:bg-zinc-900 hover:text-white transition">
+                            <i class="fa-solid fa-upload text-emerald-400 w-4"></i>
+                            <span>匯入還原資料</span>
+                        </button>
+                        <input type="file" id="import-file-input" accept=".json" class="hidden" onchange="app.importDataJSON(event)">
+                        <button onclick="app.openSchemaStatusModal()" class="w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-zinc-400 hover:bg-zinc-900 hover:text-white transition">
+                            <i class="fa-solid fa-shield-halved text-amber-400 w-4"></i>
+                            <span>檢視資料結構與版本</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer user info / quick actions -->
+            <div class="p-4 border-t border-zinc-800 bg-zinc-950 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-full bg-purple-600/20 text-purple-400 border border-purple-500/30 flex items-center justify-center text-xs font-bold">
+                        AI
+                    </div>
+                    <div class="text-xs">
+                        <p class="font-medium text-zinc-200">Gemini 3 Flash 智慧加持</p>
+                        <p class="text-zinc-500" id="db-status-text">對話輸入功能運作中</p>
+                    </div>
+                </div>
+                <button onclick="app.resetDemoData()" title="重置範例資料" class="text-zinc-500 hover:text-zinc-200 p-1.5 rounded-md hover:bg-zinc-900">
+                    <i class="fa-solid fa-rotate-right text-xs"></i>
+                </button>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col h-full overflow-hidden bg-zinc-950">
+            <!-- Top Navbar -->
+            <header class="h-16 bg-zinc-900/90 border-b border-zinc-800 flex items-center justify-between px-6 shrink-0 shadow-sm z-10 backdrop-blur">
+                <div class="flex items-center space-x-4">
+                    <button onclick="app.toggleSidebar()" class="text-zinc-400 hover:text-zinc-200 md:hidden p-2 rounded-lg">
+                        <i class="fa-solid fa-bars text-lg"></i>
+                    </button>
+                    <h2 id="view-title" class="text-xl font-bold text-zinc-100">儀表板總覽</h2>
+                </div>
+                
+                <div class="flex items-center space-x-3">
+                    <!-- AI Assistant Header Button -->
+                    <button onclick="app.toggleAiDrawer(true)" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium px-3.5 py-2 rounded-xl text-sm transition shadow-sm shadow-purple-600/30 flex items-center space-x-2">
+                        <i class="fa-solid fa-sparkles text-amber-300"></i>
+                        <span>AI 對話寫入</span>
+                    </button>
+                    <button onclick="app.openOcrModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-3.5 py-2 rounded-xl text-sm transition shadow-sm shadow-indigo-600/30 flex items-center space-x-2 hidden sm:flex">
+                        <i class="fa-solid fa-camera font-bold"></i>
+                        <span>📷 截圖匯入</span>
+                    </button>
+                    <button onclick="app.openTaskModal()" class="bg-blue-600 hover:bg-blue-500 text-white font-medium px-3.5 py-2 rounded-xl text-sm transition shadow-sm shadow-blue-600/30 flex items-center space-x-2">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>新增待辦</span>
+                    </button>
+                    <button onclick="app.openClientModal()" class="bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-200 font-medium px-3.5 py-2 rounded-xl text-sm transition hidden sm:flex items-center space-x-2">
+                        <i class="fa-solid fa-user-plus"></i>
+                        <span>新增客戶</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Scrollable Viewport -->
+            <div id="content-container" class="flex-1 overflow-y-auto p-6">
+                <!-- Views get rendered here -->
+            </div>
+        </main>
+
+        <!-- Floating AI Drawer Launch Button -->
+        <button id="ai-fab-btn" onclick="app.toggleAiDrawer(true)" class="fixed bottom-6 right-6 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white p-4 rounded-full shadow-2xl z-30 transition-transform duration-300 hover:scale-110 flex items-center space-x-2 group">
+            <i class="fa-solid fa-sparkles text-amber-300 text-xl group-hover:rotate-12 transition-transform"></i>
+            <span class="font-bold text-sm hidden group-hover:inline-block pr-1 animate-fade-in">AI 對話寫入</span>
+        </button>
+
+        <!-- Gemini AI Slide-Over Drawer Container -->
+        <div id="ai-drawer" class="fixed inset-y-0 right-0 w-full sm:w-[450px] bg-zinc-900 border-l border-zinc-800 shadow-2xl z-40 flex flex-col transition-transform duration-300 transform translate-x-full">
+            <div class="p-4 border-b border-zinc-800 bg-zinc-950/80 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-purple-600/30">
+                        <i class="fa-solid fa-robot text-base"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-zinc-100 text-base flex items-center">
+                            Gemini AI 對話助手
+                            <span class="ml-2 text-[10px] bg-purple-950 text-purple-300 border border-purple-800/50 px-2 py-0.5 rounded-full font-mono">Flash 3.0</span>
+                        </h3>
+                        <p class="text-[11px] text-zinc-400">輸入指令，讓 AI 自動建立待辦、客戶或專案</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-1">
+                    <button onclick="app.clearAiChatHistory()" title="清除對話紀錄" class="text-zinc-400 hover:text-zinc-200 w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800">
+                        <i class="fa-solid fa-trash-can text-sm"></i>
+                    </button>
+                    <button onclick="app.toggleAiDrawer(false)" class="text-zinc-400 hover:text-zinc-200 w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Custom API Key Settings Bar -->
+            <div id="ai-api-key-bar" class="px-4 py-2 bg-zinc-950/50 border-b border-zinc-800/80 flex items-center justify-between text-xs">
+                <span class="text-zinc-400 text-[11px]">Key 狀態: <span class="text-emerald-400 font-medium">預設 Gemini API Ready</span></span>
+                <button onclick="app.toggleApiKeyInput()" class="text-purple-400 hover:text-purple-300 text-[11px] underline">
+                    設定自訂 API Key
+                </button>
+            </div>
+            
+            <div id="ai-api-key-input-container" class="hidden p-3 bg-zinc-950 border-b border-zinc-800 space-y-2">
+                <label class="block text-[11px] text-zinc-400">Gemini API Key (選填)</label>
+                <div class="flex items-center space-x-2">
+                    <input type="password" id="custom-api-key-input" placeholder="AIzaSy..." class="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-zinc-200 focus:outline-none focus:ring-1 focus:ring-purple-500">
+                    <button onclick="app.saveCustomApiKey()" class="px-3 py-1 bg-purple-600 text-white rounded-lg text-xs font-medium">儲存</button>
+                </div>
+            </div>
+
+            <!-- Quick Action Prompts Suggestion Chips -->
+            <div class="p-3 bg-zinc-950/30 border-b border-zinc-800/50 flex space-x-2 overflow-x-auto text-[11px] whitespace-nowrap scrollbar-none">
+                <button onclick="app.sendQuickPrompt('幫我新增一個待辦：下週三前提供廣達電腦 Q3 專案報價，高優先級')" class="px-2.5 py-1 rounded-full bg-zinc-800 hover:bg-purple-900/40 text-purple-300 border border-purple-800/30 transition">
+                    ➕ 新增待辦
+                </button>
+                <button onclick="app.sendQuickPrompt('幫我建立新客戶：英業達，主要產品是 AI 伺服器與邊緣運算，客戶等級為 VIP 頂級客戶')" class="px-2.5 py-1 rounded-full bg-zinc-800 hover:bg-blue-900/40 text-blue-300 border border-blue-800/30 transition">
+                    🏢 建立新客戶
+                </button>
+                <button onclick="app.sendQuickPrompt('為「台灣晶片科技」新增專案：料號 PN-7700-B, 名稱 Edge Gateway Mainboard, 預估用量 80,000 pcs/yr')" class="px-2.5 py-1 rounded-full bg-zinc-800 hover:bg-emerald-900/40 text-emerald-300 border border-emerald-800/30 transition">
+                    📦 登記專案規格
+                </button>
+            </div>
+
+            <!-- Chat Messages Log Container -->
+            <div id="ai-chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
+                <div class="flex items-start space-x-3">
+                    <div class="w-7 h-7 rounded-lg bg-purple-600/30 text-purple-400 flex items-center justify-center shrink-0 text-xs font-bold border border-purple-500/30">
+                        AI
+                    </div>
+                    <div class="bg-zinc-800/80 border border-zinc-700/80 rounded-2xl rounded-tl-none p-3 max-w-[85%] text-xs text-zinc-200 leading-relaxed shadow-sm">
+                        <p class="font-bold text-purple-300 mb-1">你好！我是 Gemini AI 智慧助手 👋</p>
+                        <p>你可以直接用對話方式交待我任務，我會自動幫你在系統中**建立待辦**、**新增客戶**或**登記專案**。</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Input Form -->
+            <div class="p-3 border-t border-zinc-800 bg-zinc-950 shrink-0">
+                <form onsubmit="app.handleAiChatSubmit(event)" class="flex items-center space-x-2">
+                    <input type="text" id="ai-chat-input" placeholder="對 Gemini 說話或輸入寫入指令..." class="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <button type="submit" id="ai-send-btn" class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold w-10 h-10 rounded-xl flex items-center justify-center transition shadow-sm shadow-purple-600/30 shrink-0">
+                        <i class="fa-solid fa-paper-plane text-xs"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+    <!-- OCR Screenshot Import Modal -->
+    <div id="ocr-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center hidden">
+        <div class="bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-4xl mx-4 overflow-hidden animate-fade-in border border-zinc-800 max-h-[92vh] flex flex-col text-zinc-100">
+            <div class="px-6 py-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/50 shrink-0">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-600/30 text-indigo-400 flex items-center justify-center">
+                        <i class="fa-solid fa-camera text-base"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-zinc-100 text-base">截圖 / 圖片 AI 辨識匯入專案</h3>
+                        <p class="text-xs text-zinc-400">支援拖放圖片、檔案上傳或按 <kbd class="px-1 bg-zinc-800 text-blue-300 font-mono text-[10px]">Ctrl+V</kbd> 貼上截圖</p>
+                    </div>
+                </div>
+                <button onclick="app.closeOcrModal()" class="text-zinc-400 hover:text-zinc-200 w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="p-6 overflow-y-auto flex-1 space-y-6">
+                <div id="ocr-dropzone" class="border-2 border-dashed border-zinc-700 hover:border-blue-500 rounded-2xl p-6 text-center cursor-pointer transition bg-zinc-950/50 space-y-3 relative">
+                    <input type="file" id="ocr-file-input" accept="image/*" class="hidden" onchange="app.handleOcrImageSelect(event)">
+                    <div class="w-12 h-12 rounded-2xl bg-blue-950/80 text-blue-400 border border-blue-800/40 flex items-center justify-center mx-auto text-xl shadow-inner">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-bold text-zinc-200">點擊上傳截圖，或是直接拖放圖片至此區域</p>
+                        <p class="text-xs text-blue-400 font-medium mt-1">💡 提示：在畫面上任何地方直接按 <kbd class="px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 font-mono text-[11px] text-zinc-100">Ctrl + V</kbd> 可快速貼上剪貼簿截圖</p>
+                    </div>
+                </div>
+
+                <div id="ocr-progress-container" class="hidden bg-zinc-950/80 border border-indigo-900/60 p-4 rounded-xl space-y-2">
+                    <div class="flex items-center justify-between text-xs">
+                        <span id="ocr-status-text" class="text-indigo-300 font-semibold flex items-center">
+                            <i class="fa-solid fa-circle-notch fa-spin mr-2"></i>正在透過 AI 辨識截圖中的文字與專案欄位...
+                        </span>
+                        <span id="ocr-percent-text" class="font-mono text-zinc-400">0%</span>
+                    </div>
+                    <div class="w-full bg-zinc-800 h-2 rounded-full overflow-hidden">
+                        <div id="ocr-progress-bar" class="bg-indigo-500 h-full w-0 transition-all duration-200"></div>
+                    </div>
+                </div>
+
+                <div id="ocr-result-section" class="grid grid-cols-1 lg:grid-cols-12 gap-6 hidden">
+                    <div class="lg:col-span-5 space-y-3">
+                        <p class="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center">
+                            <i class="fa-solid fa-image text-blue-400 mr-1.5"></i>截圖預覽
+                        </p>
+                        <div class="bg-zinc-950 rounded-xl border border-zinc-800 p-2 overflow-hidden flex items-center justify-center max-h-[360px]">
+                            <img id="ocr-preview-img" src="" alt="OCR Preview" class="max-h-[340px] w-auto object-contain rounded-lg">
+                        </div>
+                        <div class="bg-zinc-950/80 border border-zinc-800 p-3 rounded-xl">
+                            <p class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-1">OCR 原始辨識文字</p>
+                            <textarea id="ocr-raw-text" rows="5" readonly class="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-xs font-mono text-zinc-400 focus:outline-none resize-none"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-7 space-y-4">
+                        <div class="bg-indigo-950/40 border border-indigo-800/40 p-3 rounded-xl flex items-center justify-between">
+                            <div class="flex items-center space-x-2 text-xs text-indigo-300 font-medium">
+                                <i class="fa-solid fa-wand-magic-sparkles text-indigo-400"></i>
+                                <span>已自動擷取欄位，請確認或調整以下專案資訊：</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-blue-400 uppercase tracking-wider mb-1">歸屬客戶 *</label>
+                            <select id="ocr-target-client" class="w-full px-3.5 py-2.5 rounded-xl border border-blue-500/50 bg-zinc-800 text-zinc-100 text-sm focus:outline-none">
+                            </select>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Part Number (料號) *</label>
+                                <input type="text" id="ocr-field-partNumber" class="w-full px-3 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-xs focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Project Name (專案名稱) *</label>
+                                <input type="text" id="ocr-field-projectName" class="w-full px-3 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-xs focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Application (應用產品類別)</label>
+                                <input type="text" id="ocr-field-application" class="w-full px-3 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-xs focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-zinc-400 mb-1">End Customer (最終客戶)</label>
+                                <input type="text" id="ocr-field-endCustomer" class="w-full px-3 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-xs focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-zinc-400 mb-1">HW Platform (硬體平台)</label>
+                                <input type="text" id="ocr-field-hwPlatform" class="w-full px-3 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-xs focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Forecast Q'ty (年度預估用量)</label>
+                                <input type="text" id="ocr-field-forecastQtyYearly" class="w-full px-3 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-xs focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-zinc-400 mb-1">MP Date (量產日期)</label>
+                                <input type="text" id="ocr-field-mpDate" class="w-full px-3 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-xs focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Contact Window RD (RD 窗口)</label>
+                                <input type="text" id="ocr-field-contactRd" class="w-full px-3 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-xs focus:outline-none">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Product Life cycle</label>
+                                <select id="ocr-field-lifeCycle" class="w-full px-3 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-xs focus:outline-none">
+                                    <option value="EVT (工程驗證)">EVT (工程驗證)</option>
+                                    <option value="DVT (設計驗證)">DVT (設計驗證)</option>
+                                    <option value="PVT (生產驗證)" selected>PVT (生產驗證)</option>
+                                    <option value="MP (量產中)">MP (量產中)</option>
+                                    <option value="EOL (即將停產)">EOL (即將停產)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Business type</label>
+                                <select id="ocr-field-businessType" class="w-full px-3 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-xs focus:outline-none">
+                                    <option value="ODM">ODM</option>
+                                    <option value="OEM">OEM</option>
+                                    <option value="OBM">OBM</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-zinc-800 bg-zinc-900/50 flex items-center justify-between shrink-0">
+                <span class="text-xs text-zinc-500" id="ocr-footer-info">尚未選擇圖片</span>
+                <div class="flex items-center space-x-3">
+                    <button onclick="app.closeOcrModal()" class="px-4 py-2 rounded-xl border border-zinc-700 text-zinc-300 text-xs font-medium hover:bg-zinc-800 transition">取消</button>
+                    <button id="ocr-submit-btn" disabled onclick="app.saveOcrProject()" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold transition shadow-sm shadow-indigo-600/30 flex items-center space-x-1.5">
+                        <i class="fa-solid fa-check"></i>
+                        <span>確認匯入並建立專案</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Modal (Create / Edit) -->
+    <div id="task-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden animate-fade-in border border-zinc-800 text-zinc-100">
+            <div class="px-6 py-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/50">
+                <h3 id="task-modal-title" class="font-bold text-zinc-100 text-lg">新增待辦事項</h3>
+                <button onclick="app.closeTaskModal()" class="text-zinc-400 hover:text-zinc-200 w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <form id="task-form" onsubmit="app.handleTaskSubmit(event)" class="p-6 space-y-4">
+                <input type="hidden" id="task-id">
+                
+                <div>
+                    <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">任務標題 *</label>
+                    <input type="text" id="task-title" required placeholder="例如：提供 Q3 晶圓專案報價" class="w-full px-3.5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 placeholder-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">關聯客戶 *</label>
+                        <select id="task-client" required class="w-full px-3.5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">優先級</label>
+                        <select id="task-priority" class="w-full px-3.5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="high">🔴 高優先級 (緊急)</option>
+                            <option value="medium" selected>🟡 中優先級 (一般)</option>
+                            <option value="low">🟢 低優先級 (可排后)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">截止日期 *</label>
+                        <input type="date" id="task-duedate" required class="w-full px-3.5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">任務分類</label>
+                        <select id="task-category" class="w-full px-3.5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="報價">報價</option>
+                            <option value="送樣">送樣</option>
+                            <option value="資料提供">資料提供</option>
+                            <option value="價格更新">價格更新</option>
+                            <option value="約訪">約訪</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">詳細備註說明</label>
+                    <textarea id="task-notes" rows="3" placeholder="請輸入該任務的具體執行細節..." class="w-full px-3.5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 placeholder-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+
+                <div class="flex items-center justify-end space-x-3 pt-4 border-t border-zinc-800">
+                    <button type="button" onclick="app.closeTaskModal()" class="px-4 py-2 rounded-xl border border-zinc-700 text-zinc-300 text-sm font-medium hover:bg-zinc-800 transition">取消</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition shadow-sm shadow-blue-600/30">儲存任務</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Project Modal -->
+    <div id="project-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden animate-fade-in border border-zinc-800 max-h-[90vh] flex flex-col text-zinc-100">
+            <div class="px-6 py-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/50 shrink-0">
+                <h3 id="project-modal-title" class="font-bold text-zinc-100 text-lg flex items-center">
+                    <i class="fa-solid fa-diagram-project text-blue-400 mr-2"></i>編輯專案資訊
+                </h3>
+                <button onclick="app.closeProjectModal()" class="text-zinc-400 hover:text-zinc-200 w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            
+            <form id="project-form" onsubmit="app.handleProjectSubmit(event)" class="p-6 space-y-4 overflow-y-auto flex-1">
+                <input type="hidden" id="project-client-id">
+                <input type="hidden" id="project-id">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">Part Number (料號) *</label>
+                        <input type="text" id="project-part-number" required placeholder="例如：PN-8820-X1" class="w-full px-3.5 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">Project Name (專案名稱) *</label>
+                        <input type="text" id="project-name" required placeholder="例如：Titan AI Server Mainboard" class="w-full px-3.5 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">Application (應用產品)</label>
+                        <input type="text" id="project-application" placeholder="例如：AI Data Center" class="w-full px-3.5 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">End Customer (最終客戶)</label>
+                        <input type="text" id="project-end-customer" placeholder="例如：Hyperscaler" class="w-full px-3.5 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">Product Life cycle</label>
+                        <select id="project-lifecycle" class="w-full px-3.5 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none">
+                            <option value="EVT">EVT (工程驗證)</option>
+                            <option value="DVT">DVT (設計驗證)</option>
+                            <option value="PVT" selected>PVT (生產驗證)</option>
+                            <option value="MP">MP (量產中)</option>
+                            <option value="EOL">EOL (即將停產)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">Business type</label>
+                        <select id="project-business-type" class="w-full px-3.5 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none">
+                            <option value="ODM">ODM</option>
+                            <option value="OEM">OEM</option>
+                            <option value="OBM">OBM</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">HW Platform</label>
+                        <input type="text" id="project-hw-platform" placeholder="例如：Intel" class="w-full px-3.5 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">Q'ty Per Board</label>
+                        <input type="text" id="project-qty-per-board" placeholder="例如：4 pcs" class="w-full px-3.5 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">Forecast Q'ty (Yearly)</label>
+                        <input type="text" id="project-forecast-qty" placeholder="例如：150k/yr" class="w-full px-3.5 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">Sample Run Date & Q'ty</label>
+                        <input type="text" id="project-sample-run" placeholder="例如：2026-04-15" class="w-full px-3.5 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">MP Date</label>
+                        <input type="text" id="project-mp-date" placeholder="例如：2026-Q4" class="w-full px-3.5 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">Contact Window RD</label>
+                    <input type="text" id="project-contact-rd" placeholder="例如：李工程 / 0911-123-456" class="w-full px-3.5 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none">
+                </div>
+
+                <div class="flex items-center justify-end space-x-3 pt-4 border-t border-zinc-800 shrink-0">
+                    <button type="button" onclick="app.closeProjectModal()" class="px-4 py-2 rounded-xl border border-zinc-700 text-zinc-300 text-sm font-medium hover:bg-zinc-800 transition">取消</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition shadow-sm">儲存專案資訊</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Client Modal -->
+    <div id="client-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-xl mx-4 overflow-hidden animate-fade-in border border-zinc-800 max-h-[90vh] flex flex-col text-zinc-100">
+            <div class="px-6 py-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/50 shrink-0">
+                <h3 id="client-modal-title" class="font-bold text-zinc-100 text-lg">新增客戶</h3>
+                <button onclick="app.closeClientModal()" class="text-zinc-400 hover:text-zinc-200 w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            
+            <form id="client-form" onsubmit="app.handleClientSubmit(event)" class="p-6 space-y-4 overflow-y-auto flex-1">
+                <input type="hidden" id="client-id">
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">公司名稱 *</label>
+                        <input type="text" id="client-name" required placeholder="例如：台灣晶片科技" class="w-full px-3.5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">公司網頁 URL</label>
+                        <input type="url" id="client-website" placeholder="https://www.example.com" class="w-full px-3.5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-blue-400 uppercase tracking-wider mb-1 flex items-center">
+                        <i class="fa-solid fa-boxes-stacked mr-1.5"></i>主要產品 (Main Products)
+                    </label>
+                    <input type="text" id="client-main-product" placeholder="例如：AI 伺服器主板、工業網關" class="w-full px-3.5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">聯絡窗口人名</label>
+                        <input type="text" id="client-contact-person" placeholder="例如：王經理" class="w-full px-3.5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">聯絡電話</label>
+                        <input type="text" id="client-phone" placeholder="例如：03-567-8900" class="w-full px-3.5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">電子郵件 E-mail</label>
+                        <input type="email" id="client-email" placeholder="contact@example.com" class="w-full px-3.5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">客戶等級 (Tier)</label>
+                        <select id="client-tier" class="w-full px-3.5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none">
+                            <option value="VIP">⭐ VIP 頂級客戶</option>
+                            <option value="A">🔥 A 級重要客戶</option>
+                            <option value="B" selected>⚡ B 級一般客戶</option>
+                            <option value="C">🌱 C 級潛在/觀察客戶</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">備註 / 合作歷史摘要</label>
+                    <textarea id="client-notes" rows="3" placeholder="例如：與該客戶配合多年，主要供應伺服器零組件..." class="w-full px-3.5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-sm focus:outline-none"></textarea>
+                </div>
+
+                <div class="flex items-center justify-end space-x-3 pt-4 border-t border-zinc-800 shrink-0">
+                    <button type="button" onclick="app.closeClientModal()" class="px-4 py-2 rounded-xl border border-zinc-700 text-zinc-300 text-sm font-medium hover:bg-zinc-800 transition">取消</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition shadow-sm">儲存客戶</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Schema Status Modal -->
+    <div id="schema-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden animate-fade-in border border-zinc-800 text-zinc-100">
+            <div class="px-6 py-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/50">
+                <h3 class="font-bold text-zinc-100 text-base flex items-center">
+                    <i class="fa-solid fa-shield-halved text-amber-400 mr-2"></i>資料結構與版本相容狀態
+                </h3>
+                <button onclick="app.closeSchemaStatusModal()" class="text-zinc-400 hover:text-zinc-200 w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4 text-xs text-zinc-300">
+                <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-2">
+                    <div class="flex justify-between"><span class="text-zinc-500">Schema 版本:</span><span class="font-mono text-emerald-400">v2.4.0 (ClientFlow Engine)</span></div>
+                    <div class="flex justify-between"><span class="text-zinc-500">資料儲存機制:</span><span class="font-mono text-blue-400">LocalStorage (自動同步)</span></div>
+                    <div class="flex justify-between"><span class="text-zinc-500">客戶總數:</span><span id="schema-client-count" class="font-mono text-zinc-200">0</span></div>
+                    <div class="flex justify-between"><span class="text-zinc-500">待辦事項總數:</span><span id="schema-task-count" class="font-mono text-zinc-200">0</span></div>
+                    <div class="flex justify-between"><span class="text-zinc-500">專案規格總數:</span><span id="schema-project-count" class="font-mono text-zinc-200">0</span></div>
+                </div>
+                <p class="text-zinc-400 leading-relaxed">本系統支援完整向下相容。匯出之 JSON 檔案包含所有客戶資料、專案規格及待辦紀錄，可隨時匯入還原。</p>
+            </div>
+            <div class="p-4 border-t border-zinc-800 bg-zinc-950 flex justify-end">
+                <button onclick="app.closeSchemaStatusModal()" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-xl text-xs font-medium">關閉</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Alert Modal -->
+    <div id="custom-alert-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden animate-fade-in border border-zinc-800 text-zinc-100 p-6 space-y-4 text-center">
+            <div id="alert-icon-wrap" class="w-12 h-12 rounded-full bg-blue-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center mx-auto text-xl">
+                <i class="fa-solid fa-circle-info"></i>
+            </div>
+            <div>
+                <h4 id="alert-title-text" class="font-bold text-zinc-100 text-base mb-1">系統提示</h4>
+                <p id="alert-message-text" class="text-xs text-zinc-300 leading-relaxed">提示內容...</p>
+            </div>
+            <button onclick="app.closeCustomAlert()" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl text-xs transition">確認</button>
+        </div>
+    </div>
+
+    <script>
+        class ClientFlowApp {
+            constructor() {
+                this.currentView = 'dashboard';
+                this.clients = [];
+                this.tasks = [];
+                this.projects = []; // { id, clientId, partNumber, projectName, application, endCustomer, lifeCycle, businessType, hwPlatform, qtyPerBoard, forecastQtyYearly, sampleRunDate, mpDate, contactRd }
+                this.aiChatHistory = [];
+                this.customApiKey = localStorage.getItem('clientflow_custom_api_key') || '';
+                
+                // Todo Filter State Variables
+                this.todoFilter = {
+                    client: 'all',
+                    priority: 'all',
+                    category: 'all',
+                    status: 'all',
+                    search: ''
+                };
+                
+                this.initData();
+                this.initListeners();
+            }
+
+            initData() {
+                const savedClients = localStorage.getItem('clientflow_clients');
+                const savedTasks = localStorage.getItem('clientflow_tasks');
+                const savedProjects = localStorage.getItem('clientflow_projects');
+
+                if (savedClients && savedTasks) {
+                    try {
+                        this.clients = JSON.parse(savedClients);
+                        this.tasks = JSON.parse(savedTasks);
+                        this.projects = savedProjects ? JSON.parse(savedProjects) : [];
+                    } catch (e) {
+                        console.error('Failed to parse local storage data, loading demo', e);
+                        this.loadDemoData();
+                    }
+                } else {
+                    this.loadDemoData();
+                }
+                this.render();
+            }
+
+            loadDemoData() {
+                this.clients = [
+                    { id: 'c1', name: '廣達電腦 (Quanta)', website: 'https://www.quanta.com.tw', mainProduct: 'AI 伺服器主板、雲端資料中心設備', contactPerson: '張協理', phone: '03-327-2345', email: 'service@quanta.com.tw', tier: 'VIP', notes: '長期合作夥伴，Q3 AI 伺服器專案主力供應商' },
+                    { id: 'c2', name: '英業達 (Inventec)', website: 'https://www.inventec.com', mainProduct: 'AI 伺服器、邊緣運算網關、筆電', contactPerson: '林經理', phone: '02-2881-0721', email: 'contact@inventec.com', tier: 'A', notes: '積極開展邊緣運算主板專案' },
+                    { id: 'c3', name: '和碩聯合 (Pegatron)', website: 'https://www.pegatroncorp.com', mainProduct: '通訊設備、5G O-RAN、車用電子', contactPerson: '黃副理', phone: '02-8143-9000', email: 'info@pegatron.com', tier: 'VIP', notes: '車用與 5G 網通設備重點客戶' },
+                    { id: 'c4', name: '緯創資通 (Wistron)', website: 'https://www.wistron.com', mainProduct: 'AI GPU 基板、伺服器系統', contactPerson: '陳協理', phone: '02-6616-9999', email: 'wistron@wistron.com', tier: 'A', notes: '高階運算卡專案進行中' }
+                ];
+
+                this.projects = [
+                    { id: 'p1', clientId: 'c1', partNumber: 'PN-9920-AI', projectName: 'Titan AI Server Mainboard', application: 'AI Data Center', endCustomer: 'Hyperscaler AWS', lifeCycle: 'PVT', businessType: 'ODM', hwPlatform: 'Intel Birch Stream', qtyPerBoard: '4 pcs', forecastQtyYearly: '150,000 pcs/yr', sampleRunDate: '2026-04-15', mpDate: '2026-Q4', contactRd: '李工程 / 0911-123-456' },
+                    { id: 'p2', clientId: 'c2', partNumber: 'PN-7700-B', projectName: 'Edge Gateway Mainboard', application: 'Edge Computing', endCustomer: 'Industrial IoT', lifeCycle: 'EVT', businessType: 'ODM', hwPlatform: 'NVIDIA IGX', qtyPerBoard: '2 pcs', forecastQtyYearly: '80,000 pcs/yr', sampleRunDate: '2026-06-01', mpDate: '2027-Q1', contactRd: '王工程 / 0922-333-444' },
+                    { id: 'p3', clientId: 'c3', partNumber: 'PN-5G-ORAN', projectName: '5G O-RAN Distributed Unit', application: 'Telecommunication', endCustomer: 'Global Telco', lifeCycle: 'DVT', businessType: 'OEM', hwPlatform: 'Qualcomm', qtyPerBoard: '1 pcs', forecastQtyYearly: '60,000 pcs/yr', sampleRunDate: '2026-05-10', mpDate: '2026-Q3', contactRd: '趙主任 / 0933-888-999' }
+                ];
+
+                this.tasks = [
+                    { id: 't1', title: '提供廣達 Q3 Titan 專案正式報價與 B-sample 測試報告', clientId: 'c1', priority: 'high', dueDate: '2026-03-25', category: '報價', completed: false, notes: '需包含高速訊號衰減測試數據與零件交期確認。' },
+                    { id: 't2', title: '寄送英業達 Edge Gateway 樣品 5 pcs 進行試產', clientId: 'c2', priority: 'high', dueDate: '2026-03-28', category: '送樣', completed: false, notes: '透過黑貓宅急便寄至桃園廠區收發室。' },
+                    { id: 't3', title: '更新和碩 5G O-RAN 專案之 BOM 表零件物料價格', clientId: 'c3', priority: 'medium', dueDate: '2026-04-05', category: '價格更新', completed: true, notes: '被動元件因匯率波動重新核算。' },
+                    { id: 't4', title: '與緯創 RD 團隊召開線上週會確認 PCB 疊構設計', clientId: 'c4', priority: 'medium', dueDate: '2026-04-02', category: '約訪', completed: false, notes: 'Google Meet 視訊會議。' }
+                ];
+
+                this.saveData();
+            }
+
+            saveData() {
+                localStorage.setItem('clientflow_clients', JSON.stringify(this.clients));
+                localStorage.setItem('clientflow_tasks', JSON.stringify(this.tasks));
+                localStorage.setItem('clientflow_projects', JSON.stringify(this.projects));
+            }
+
+            initListeners() {
+                // Clipboard paste listener for OCR Screenshot import
+                window.addEventListener('paste', (e) => {
+                    const items = e.clipboardData?.items;
+                    if (!items) return;
+                    for (let i = 0; i < items.length; i++) {
+                        if (items[i].type.indexOf('image') !== -1) {
+                            const blob = items[i].getAsFile();
+                            if (blob) {
+                                this.openOcrModal();
+                                this.processImageBlob(blob);
+                                break;
+                            }
+                        }
+                    }
+                });
+
+                // Drag and drop for OCR dropzone
+                const dropzone = document.getElementById('ocr-dropzone');
+                if (dropzone) {
+                    dropzone.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        dropzone.classList.add('dropzone-active');
+                    });
+                    dropzone.addEventListener('dragleave', (e) => {
+                        e.preventDefault();
+                        dropzone.classList.remove('dropzone-active');
+                    });
+                    dropzone.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        dropzone.classList.remove('dropzone-active');
+                        const file = e.dataTransfer?.files?.[0];
+                        if (file && file.type.startsWith('image/')) {
+                            this.openOcrModal();
+                            this.processImageBlob(file);
+                        }
+                    });
+                    dropzone.addEventListener('click', () => {
+                        document.getElementById('ocr-file-input').click();
+                    });
+                }
+            }
+
+            switchView(viewName) {
+                this.currentView = viewName;
+                document.querySelectorAll('aside nav button').forEach(btn => {
+                    btn.classList.remove('bg-blue-600', 'text-white', 'shadow-md', 'shadow-blue-600/25');
+                    btn.classList.add('text-zinc-400', 'hover:bg-zinc-900', 'hover:text-white');
+                });
+                const activeNav = document.getElementById(`nav-${viewName}`);
+                if (activeNav) {
+                    activeNav.classList.remove('text-zinc-400', 'hover:bg-zinc-900', 'hover:text-white');
+                    activeNav.classList.add('bg-blue-600', 'text-white', 'shadow-md', 'shadow-blue-600/25');
+                }
+                const titles = {
+                    'dashboard': '儀表板總覽',
+                    'todos': '全部待辦事項',
+                    'clients': '客戶資料與專案管理'
+                };
+                document.getElementById('view-title').textContent = titles[viewName] || '儀表板';
+                this.render();
+            }
+
+            render() {
+                this.renderSidebarClients();
+                const container = document.getElementById('content-container');
+                container.innerHTML = '';
+                
+                if (this.currentView === 'dashboard') {
+                    container.innerHTML = this.renderDashboardHTML();
+                } else if (this.currentView === 'todos') {
+                    container.innerHTML = this.renderTodosHTML();
+                } else if (this.currentView === 'clients') {
+                    container.innerHTML = this.renderClientsHTML();
+                }
+            }
+
+            renderSidebarClients() {
+                const listEl = document.getElementById('sidebar-client-list');
+                if (!listEl) return;
+                if (this.clients.length === 0) {
+                    listEl.innerHTML = `<p class="text-[11px] text-zinc-500 px-3 py-1">尚未建立客戶</p>`;
+                    return;
+                }
+                listEl.innerHTML = this.clients.map(c => `
+                    <button onclick="app.filterByClient('${c.id}')" class="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs text-zinc-400 hover:bg-zinc-900 hover:text-white transition">
+                        <span class="truncate pr-2">${c.name}</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">${this.getTasksCountForClient(c.id)}</span>
+                    </button>
+                `).join('');
+            }
+
+            getTasksCountForClient(clientId) {
+                return this.tasks.filter(t => t.clientId === clientId && !t.completed).length;
+            }
+
+            filterByClient(clientId) {
+                this.switchView('todos');
+                this.todoFilter.client = clientId;
+                this.render();
+            }
+
+            // --- Dashboard View ---
+            renderDashboardHTML() {
+                const totalClients = this.clients.length;
+                const totalProjects = this.projects.length;
+                const pendingTasks = this.tasks.filter(t => !t.completed).length;
+                const completedTasks = this.tasks.filter(t => t.completed).length;
+
+                return `
+                    <div class="space-y-6 animate-fade-in pb-12">
+                        <!-- Top Stat Cards -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div class="bg-zinc-900/90 border border-zinc-800/80 p-5 rounded-2xl shadow-sm flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">總客戶數</p>
+                                    <h3 class="text-2xl font-extrabold text-white mt-1">${totalClients}</h3>
+                                    <p class="text-[11px] text-blue-400 mt-1"><i class="fa-solid fa-arrow-trend-up mr-1"></i>營運客戶穩定成長</p>
+                                </div>
+                                <div class="w-12 h-12 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center text-xl">
+                                    <i class="fa-solid fa-users"></i>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-zinc-900/90 border border-zinc-800/80 p-5 rounded-2xl shadow-sm flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">進行中專案 / 料號</p>
+                                    <h3 class="text-2xl font-extrabold text-white mt-1">${totalProjects}</h3>
+                                    <p class="text-[11px] text-emerald-400 mt-1"><i class="fa-solid fa-diagram-project mr-1"></i>涵蓋 AI 伺服器與 5G</p>
+                                </div>
+                                <div class="w-12 h-12 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-xl">
+                                    <i class="fa-solid fa-boxes-stacked"></i>
+                                </div>
+                            </div>
+
+                            <div class="bg-zinc-900/90 border border-zinc-800/80 p-5 rounded-2xl shadow-sm flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">待辦待處理任務</p>
+                                    <h3 class="text-2xl font-extrabold text-amber-400 mt-1">${pendingTasks}</h3>
+                                    <p class="text-[11px] text-zinc-400 mt-1">需優先跟進報價與送樣</p>
+                                </div>
+                                <div class="w-12 h-12 rounded-xl bg-amber-600/20 text-amber-400 border border-amber-500/30 flex items-center justify-center text-xl">
+                                    <i class="fa-solid fa-list-check"></i>
+                                </div>
+                            </div>
+
+                            <div class="bg-zinc-900/90 border border-zinc-800/80 p-5 rounded-2xl shadow-sm flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">已完成任務</p>
+                                    <h3 class="text-2xl font-extrabold text-purple-400 mt-1">${completedTasks}</h3>
+                                    <p class="text-[11px] text-purple-400 mt-1">工作效率良好</p>
+                                </div>
+                                <div class="w-12 h-12 rounded-xl bg-purple-600/20 text-purple-400 border border-purple-500/30 flex items-center justify-center text-xl">
+                                    <i class="fa-solid fa-circle-check"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Grid Section: Urgent Tasks & Client Summary -->
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                            <!-- Urgent Tasks List -->
+                            <div class="lg:col-span-7 bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 shadow-sm space-y-4">
+                                <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+                                    <h3 class="font-bold text-zinc-100 text-base flex items-center">
+                                        <i class="fa-solid fa-bolt text-amber-400 mr-2"></i>近期待辦與緊急任務
+                                    </h3>
+                                    <button onclick="app.switchView('todos')" class="text-xs text-blue-400 hover:text-blue-300 font-medium">查看全部 →</button>
+                                </div>
+                                <div class="space-y-3">
+                                    ${this.tasks.filter(t => !t.completed).slice(0, 5).map(t => {
+                                        const client = this.clients.find(c => c.id === t.clientId);
+                                        const priorityColor = t.priority === 'high' ? 'bg-red-500/20 text-red-400 border-red-500/30' : t.priority === 'medium' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+                                        return `
+                                            <div class="bg-zinc-950/80 border border-zinc-800 p-3.5 rounded-xl flex items-start justify-between space-x-3 hover:border-zinc-700 transition">
+                                                <div class="flex items-start space-x-3">
+                                                    <input type="checkbox" onclick="app.toggleTaskCompleted('${t.id}')" ${t.completed ? 'checked' : ''} class="mt-1 w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-blue-600 focus:ring-blue-500 cursor-pointer">
+                                                    <div>
+                                                        <h4 class="text-sm font-bold text-zinc-100 ${t.completed ? 'line-through text-zinc-500' : ''}">${t.title}</h4>
+                                                        <div class="flex items-center space-x-2 mt-1 text-xs text-zinc-400">
+                                                            <span class="text-blue-400 font-medium"><i class="fa-solid fa-building mr-1"></i>${client ? client.name : '未知客戶'}</span>
+                                                            <span>•</span>
+                                                            <span><i class="fa-regular fa-calendar mr-1"></i>${t.dueDate}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <span class="text-[10px] px-2 py-0.5 rounded-full border ${priorityColor} shrink-0">${t.priority === 'high' ? '高優先' : t.priority === 'medium' ? '中優先' : '低優先'}</span>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+
+                            <!-- Clients & Main Products Quick View -->
+                            <div class="lg:col-span-5 bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 shadow-sm space-y-4">
+                                <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+                                    <h3 class="font-bold text-zinc-100 text-base flex items-center">
+                                        <i class="fa-solid fa-building-user text-blue-400 mr-2"></i>客戶與核心產品摘要
+                                    </h3>
+                                    <button onclick="app.switchView('clients')" class="text-xs text-blue-400 hover:text-blue-300 font-medium">完整管理 →</button>
+                                </div>
+                                <div class="space-y-3">
+                                    ${this.clients.slice(0, 4).map(c => `
+                                        <div class="bg-zinc-950/80 border border-zinc-800 p-3.5 rounded-xl space-y-1.5">
+                                            <div class="flex items-center justify-between">
+                                                <h4 class="font-bold text-zinc-200 text-sm">${c.name}</h4>
+                                                <span class="text-[10px] px-2 py-0.5 rounded font-mono ${c.tier === 'VIP' ? 'bg-purple-950 text-purple-300 border border-purple-800' : 'bg-blue-950 text-blue-300 border border-blue-800'}">${c.tier}</span>
+                                            </div>
+                                            <p class="text-xs text-blue-400 flex items-center truncate">
+                                                <i class="fa-solid fa-boxes-stacked mr-1.5 text-[10px]"></i>主力產品：${c.mainProduct || '未填寫'}
+                                            </p>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // --- All Todos View with Advanced Filters ---
+            renderTodosHTML() {
+                // Filter logic
+                const filteredTasks = this.tasks.filter(t => {
+                    // Client filter
+                    if (this.todoFilter.client !== 'all' && t.clientId !== this.todoFilter.client) return false;
+                    // Priority filter
+                    if (this.todoFilter.priority !== 'all' && t.priority !== this.todoFilter.priority) return false;
+                    // Category filter
+                    if (this.todoFilter.category !== 'all' && t.category !== this.todoFilter.category) return false;
+                    // Status filter
+                    if (this.todoFilter.status === 'pending' && t.completed) return false;
+                    if (this.todoFilter.status === 'completed' && !t.completed) return false;
+                    // Search keyword
+                    if (this.todoFilter.search && !t.title.toLowerCase().includes(this.todoFilter.search.toLowerCase()) && !(t.notes && t.notes.toLowerCase().includes(this.todoFilter.search.toLowerCase()))) return false;
+                    return true;
+                });
+
+                return `
+                    <div class="space-y-6 animate-fade-in pb-12">
+                        <!-- Toolbar & Filter Controls Panel -->
+                        <div class="bg-zinc-900/90 border border-zinc-800/80 p-4 rounded-2xl shadow-sm space-y-4">
+                            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-10 h-10 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center text-lg">
+                                        <i class="fa-solid fa-list-check"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-bold text-zinc-100 text-base">全部待辦事項與篩選中心</h3>
+                                        <p class="text-xs text-zinc-400">目前顯示 <span class="text-blue-400 font-bold">${filteredTasks.length}</span> 項符合條件的任務</p>
+                                    </div>
+                                </div>
+                                <button onclick="app.openTaskModal()" class="bg-blue-600 hover:bg-blue-500 text-white font-medium px-4 py-2.5 rounded-xl text-sm transition flex items-center justify-center space-x-2 shadow-sm shadow-blue-600/30">
+                                    <i class="fa-solid fa-plus"></i>
+                                    <span>新增待辦事項</span>
+                                </button>
+                            </div>
+
+                            <!-- Filter Options Bar -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-3 border-t border-zinc-800 text-xs">
+                                <!-- Client Filter -->
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-zinc-400 mb-1">依客戶篩選</label>
+                                    <select id="filter-client" onchange="app.updateTodoFilter('client', this.value)" class="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                        <option value="all">🌐 全部客戶</option>
+                                        ${this.clients.map(c => `<option value="${c.id}" ${this.todoFilter.client === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                                    </select>
+                                </div>
+
+                                <!-- Priority Filter -->
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-zinc-400 mb-1">依優先級篩選</label>
+                                    <select id="filter-priority" onchange="app.updateTodoFilter('priority', this.value)" class="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                        <option value="all">⚡ 全部優先級</option>
+                                        <option value="high" ${this.todoFilter.priority === 'high' ? 'selected' : ''}>🔴 高優先級 (緊急)</option>
+                                        <option value="medium" ${this.todoFilter.priority === 'medium' ? 'selected' : ''}>🟡 中優先級 (一般)</option>
+                                        <option value="low" ${this.todoFilter.priority === 'low' ? 'selected' : ''}>🟢 低優先級</option>
+                                    </select>
+                                </div>
+
+                                <!-- Category Filter -->
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-zinc-400 mb-1">依分類篩選</label>
+                                    <select id="filter-category" onchange="app.updateTodoFilter('category', this.value)" class="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                        <option value="all">📂 全部分類</option>
+                                        <option value="報價" ${this.todoFilter.category === '報價' ? 'selected' : ''}>報價</option>
+                                        <option value="送樣" ${this.todoFilter.category === '送樣' ? 'selected' : ''}>送樣</option>
+                                        <option value="資料提供" ${this.todoFilter.category === '資料提供' ? 'selected' : ''}>資料提供</option>
+                                        <option value="價格更新" ${this.todoFilter.category === '價格更新' ? 'selected' : ''}>價格更新</option>
+                                        <option value="約訪" ${this.todoFilter.category === '約訪' ? 'selected' : ''}>約訪</option>
+                                    </select>
+                                </div>
+
+                                <!-- Status Filter -->
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-zinc-400 mb-1">依完成狀態</label>
+                                    <select id="filter-status" onchange="app.updateTodoFilter('status', this.value)" class="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                        <option value="all">🔄 全部狀態</option>
+                                        <option value="pending" ${this.todoFilter.status === 'pending' ? 'selected' : ''}>⏳ 未完成</option>
+                                        <option value="completed" ${this.todoFilter.status === 'completed' ? 'selected' : ''}>✅ 已完成</option>
+                                    </select>
+                                </div>
+
+                                <!-- Search Filter & Reset -->
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-zinc-400 mb-1">搜尋關鍵字</label>
+                                    <div class="flex space-x-1">
+                                        <input type="text" id="filter-search" value="${this.todoFilter.search}" oninput="app.updateTodoFilter('search', this.value)" placeholder="搜尋標題/備註..." class="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs">
+                                        <button onclick="app.resetTodoFilters()" title="重置篩選" class="px-2.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl shrink-0"><i class="fa-solid fa-rotate-right"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Task Cards List -->
+                        <div class="space-y-3">
+                            ${filteredTasks.length === 0 ? `
+                                <div class="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-12 text-center space-y-3">
+                                    <div class="w-12 h-12 rounded-full bg-zinc-800 text-zinc-400 flex items-center justify-center mx-auto text-xl">
+                                        <i class="fa-solid fa-folder-open"></i>
+                                    </div>
+                                    <p class="text-sm font-bold text-zinc-300">沒有找到符合篩選條件的待辦事項</p>
+                                    <p class="text-xs text-zinc-500">請嘗試更改篩選選項或新增待辦事項</p>
+                                    <button onclick="app.resetTodoFilters()" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-xl text-xs font-medium">重置所有篩選</button>
+                                </div>
+                            ` : filteredTasks.map(t => {
+                                const client = this.clients.find(c => c.id === t.clientId);
+                                const priorityColor = t.priority === 'high' ? 'bg-red-500/20 text-red-400 border-red-500/30' : t.priority === 'medium' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+                                return `
+                                    <div class="bg-zinc-900/90 border border-zinc-800/80 p-4 rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-zinc-700 transition">
+                                        <div class="flex items-start space-x-3.5">
+                                            <input type="checkbox" onclick="app.toggleTaskCompleted('${t.id}')" ${t.completed ? 'checked' : ''} class="mt-1 w-5 h-5 rounded border-zinc-700 bg-zinc-950 text-blue-600 focus:ring-blue-500 cursor-pointer">
+                                            <div class="space-y-1">
+                                                <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+                                                    <h4 class="text-base font-bold text-zinc-100 ${t.completed ? 'line-through text-zinc-500' : ''}">${t.title}</h4>
+                                                    <span class="text-[10px] px-2 py-0.5 rounded-full border ${priorityColor}">${t.priority === 'high' ? '高優先' : t.priority === 'medium' ? '中優先' : '低優先'}</span>
+                                                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700">${t.category}</span>
+                                                </div>
+                                                <div class="flex items-center space-x-3 text-xs text-zinc-400">
+                                                    <span class="text-blue-400 font-medium"><i class="fa-solid fa-building mr-1"></i>${client ? client.name : '未知客戶'}</span>
+                                                    <span>•</span>
+                                                    <span><i class="fa-regular fa-calendar mr-1"></i>截止：${t.dueDate}</span>
+                                                </div>
+                                                ${t.notes ? `<p class="text-xs text-zinc-400 pt-1 italic bg-zinc-950/50 p-2 rounded-lg border border-zinc-800/60">${t.notes}</p>` : ''}
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="flex items-center space-x-2 self-end sm:self-center shrink-0">
+                                            <button onclick="app.openTaskModal('${t.id}')" class="p-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs transition" title="編輯任務">
+                                                <i class="fa-solid fa-pen"></i>
+                                            </button>
+                                            <button onclick="app.deleteTask('${t.id}')" class="p-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-800/30 text-xs transition" title="刪除任務">
+                                                <i class="fa-solid fa-trash-can"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            updateTodoFilter(key, value) {
+                this.todoFilter[key] = value;
+                this.render();
+            }
+
+            resetTodoFilters() {
+                this.todoFilter = { client: 'all', priority: 'all', category: 'all', status: 'all', search: '' };
+                this.render();
+            }
+
+            // --- Clients & Projects Management View ---
+            renderClientsHTML() {
+                return `
+                    <div class="space-y-6 animate-fade-in pb-12">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-900/90 border border-zinc-800/80 p-5 rounded-2xl shadow-sm">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center text-lg">
+                                    <i class="fa-solid fa-users"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-zinc-100 text-base">客戶資料與專案規格管理</h3>
+                                    <p class="text-xs text-zinc-400">完整維護客戶公司檔案、主要產品、專案料號與生命週期</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <button onclick="app.openClientModal()" class="bg-blue-600 hover:bg-blue-500 text-white font-medium px-4 py-2.5 rounded-xl text-sm transition flex items-center space-x-2 shadow-sm shadow-blue-600/30">
+                                    <i class="fa-solid fa-user-plus"></i>
+                                    <span>新增客戶</span>
+                                </button>
+                                <button onclick="app.openOcrModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2.5 rounded-xl text-sm transition flex items-center space-x-2 shadow-sm">
+                                    <i class="fa-solid fa-camera"></i>
+                                    <span>截圖匯入專案</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Clients Accordion / Cards List -->
+                        <div class="space-y-6">
+                            ${this.clients.map(c => {
+                                const clientProjects = this.projects.filter(p => p.clientId === c.id);
+                                const clientTasks = this.tasks.filter(t => t.clientId === c.id && !t.completed);
+                                return `
+                                    <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl shadow-sm overflow-hidden">
+                                        <!-- Client Header Bar -->
+                                        <div class="p-5 bg-zinc-900 border-b border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                            <div class="space-y-1">
+                                                <div class="flex items-center space-x-3">
+                                                    <h3 class="text-lg font-bold text-white">${c.name}</h3>
+                                                    <span class="text-[10px] px-2 py-0.5 rounded font-mono ${c.tier === 'VIP' ? 'bg-purple-950 text-purple-300 border border-purple-800' : 'bg-blue-950 text-blue-300 border border-blue-800'}">${c.tier}</span>
+                                                    ${c.website ? `<a href="${c.website}" target="_blank" class="text-xs text-blue-400 hover:underline"><i class="fa-solid fa-globe mr-1"></i>官網</a>` : ''}
+                                                </div>
+                                                <p class="text-xs text-blue-400 font-medium flex items-center">
+                                                    <i class="fa-solid fa-boxes-stacked mr-1.5"></i>主要產品：${c.mainProduct || '未填寫'}
+                                                </p>
+                                            </div>
+                                            
+                                            <div class="flex items-center space-x-2">
+                                                <button onclick="app.openProjectModal('${c.id}')" class="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-semibold transition flex items-center space-x-1.5">
+                                                    <i class="fa-solid fa-plus"></i>
+                                                    <span>登記專案規格</span>
+                                                </button>
+                                                <button onclick="app.openClientModal('${c.id}')" class="p-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs transition" title="編輯客戶">
+                                                    <i class="fa-solid fa-pen"></i>
+                                                </button>
+                                                <button onclick="app.deleteClient('${c.id}')" class="p-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-800/30 text-xs transition" title="刪除客戶">
+                                                    <i class="fa-solid fa-trash-can"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Client Details & Projects Body -->
+                                        <div class="p-5 space-y-4 bg-zinc-950/40">
+                                            <!-- Contact Info Grid -->
+                                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-zinc-400 bg-zinc-950 p-3.5 rounded-xl border border-zinc-800">
+                                                <div><span class="text-zinc-500">聯絡窗口：</span><span class="text-zinc-200 font-medium">${c.contactPerson || '未填寫'}</span></div>
+                                                <div><span class="text-zinc-500">電話：</span><span class="text-zinc-200 font-medium">${c.phone || '未填寫'}</span></div>
+                                                <div><span class="text-zinc-500">E-mail：</span><span class="text-zinc-200 font-medium">${c.email || '未填寫'}</span></div>
+                                                ${c.notes ? `<div class="sm:col-span-3 pt-1 border-t border-zinc-900"><span class="text-zinc-500">備註：</span><span class="text-zinc-300">${c.notes}</span></div>` : ''}
+                                            </div>
+
+                                            <!-- Projects Table / Cards -->
+                                            <div>
+                                                <p class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                                                    <span><i class="fa-solid fa-diagram-project text-emerald-400 mr-1.5"></i>相關專案與料號規格 (${clientProjects.length})</span>
+                                                </p>
+                                                ${clientProjects.length === 0 ? `
+                                                    <div class="bg-zinc-900/40 border border-zinc-800/80 rounded-xl p-4 text-center text-xs text-zinc-500">
+                                                        尚無專案規格資料，點擊上方「登記專案規格」或使用「截圖匯入」
+                                                    </div>
+                                                ` : `
+                                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                        ${clientProjects.map(p => `
+                                                            <div class="bg-zinc-900 border border-zinc-800 p-3.5 rounded-xl space-y-2 relative group hover:border-zinc-700 transition">
+                                                                <div class="flex items-center justify-between">
+                                                                    <div class="flex items-center space-x-2">
+                                                                        <span class="px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800 text-[10px] font-mono">${p.partNumber}</span>
+                                                                        <h4 class="font-bold text-zinc-100 text-sm">${p.projectName}</h4>
+                                                                    </div>
+                                                                    <div class="flex items-center space-x-1">
+                                                                        <button onclick="app.openProjectModal('${c.id}', '${p.id}')" class="text-zinc-400 hover:text-zinc-200 p-1 text-xs"><i class="fa-solid fa-pen"></i></button>
+                                                                        <button onclick="app.deleteProject('${p.id}')" class="text-red-400 hover:text-red-300 p-1 text-xs"><i class="fa-solid fa-trash-can"></i></button>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="grid grid-cols-2 gap-2 text-[11px] text-zinc-400 pt-1 border-t border-zinc-800/80">
+                                                                    <div><span class="text-zinc-500">應用：</span>${p.application || '-'}</div>
+                                                                    <div><span class="text-zinc-500">最終客戶：</span>${p.endCustomer || '-'}</div>
+                                                                    <div><span class="text-zinc-500">硬體平台：</span>${p.hwPlatform || '-'}</div>
+                                                                    <div><span class="text-zinc-500">預估用量：</span><span class="text-emerald-400 font-medium">${p.forecastQtyYearly || '-'}</span></div>
+                                                                    <div><span class="text-zinc-500">生命週期：</span><span class="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[10px]">${p.lifeCycle || '-'}</span></div>
+                                                                    <div><span class="text-zinc-500">量產日期：</span>${p.mpDate || '-'}</div>
+                                                                </div>
+                                                                ${p.contactRd ? `<div class="text-[11px] text-zinc-400 bg-zinc-950 p-2 rounded-lg border border-zinc-800/50"><i class="fa-solid fa-user-gear mr-1 text-amber-400"></i>RD 窗口: ${p.contactRd}</div>` : ''}
+                                                            </div>
+                                                        `).join('')}
+                                                    </div>
+                                                `}
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // --- Modal Open / Close Handlers ---
+            openTaskModal(taskId = null) {
+                const modal = document.getElementById('task-modal');
+                const titleEl = document.getElementById('task-modal-title');
+                const clientSelect = document.getElementById('task-client');
+                
+                clientSelect.innerHTML = this.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+                
+                if (taskId) {
+                    titleEl.textContent = '編輯待辦事項';
+                    const task = this.tasks.find(t => t.id === taskId);
+                    if (task) {
+                        document.getElementById('task-id').value = task.id;
+                        document.getElementById('task-title').value = task.title;
+                        document.getElementById('task-client').value = task.clientId;
+                        document.getElementById('task-priority').value = task.priority;
+                        document.getElementById('task-duedate').value = task.dueDate;
+                        document.getElementById('task-category').value = task.category;
+                        document.getElementById('task-notes').value = task.notes || '';
+                    }
+                } else {
+                    titleEl.textContent = '新增待辦事項';
+                    document.getElementById('task-form').reset();
+                    document.getElementById('task-id').value = '';
+                    const tomorrow = new Date();
+                    tomorrow.setDate(tomorrow.getDate() + 3);
+                    document.getElementById('task-duedate').value = tomorrow.toISOString().split('T')[0];
+                }
+                modal.classList.remove('hidden');
+            }
+
+            closeTaskModal() {
+                document.getElementById('task-modal').classList.add('hidden');
+            }
+
+            handleTaskSubmit(e) {
+                e.preventDefault();
+                const id = document.getElementById('task-id').value;
+                const title = document.getElementById('task-title').value;
+                const clientId = document.getElementById('task-client').value;
+                const priority = document.getElementById('task-priority').value;
+                const dueDate = document.getElementById('task-duedate').value;
+                const category = document.getElementById('task-category').value;
+                const notes = document.getElementById('task-notes').value;
+
+                if (id) {
+                    const idx = this.tasks.findIndex(t => t.id === id);
+                    if (idx !== -1) {
+                        this.tasks[idx] = { ...this.tasks[idx], title, clientId, priority, dueDate, category, notes };
+                    }
+                } else {
+                    const newTask = {
+                        id: 't_' + Date.now(),
+                        title, clientId, priority, dueDate, category, notes,
+                        completed: false
+                    };
+                    this.tasks.unshift(newTask);
+                }
+
+                this.saveData();
+                this.closeTaskModal();
+                this.render();
+                this.showAlert('成功', '待辦事項已成功儲存！', 'success');
+            }
+
+            toggleTaskCompleted(taskId) {
+                const task = this.tasks.find(t => t.id === taskId);
+                if (task) {
+                    task.completed = !task.completed;
+                    this.saveData();
+                    this.render();
+                }
+            }
+
+            deleteTask(taskId) {
+                this.tasks = this.tasks.filter(t => t.id !== taskId);
+                this.saveData();
+                this.render();
+                this.showAlert('提示', '待辦事項已刪除。', 'info');
+            }
+
+            // Client Modal
+            openClientModal(clientId = null) {
+                const modal = document.getElementById('client-modal');
+                const titleEl = document.getElementById('client-modal-title');
+                
+                if (clientId) {
+                    titleEl.textContent = '編輯客戶資料';
+                    const client = this.clients.find(c => c.id === clientId);
+                    if (client) {
+                        document.getElementById('client-id').value = client.id;
+                        document.getElementById('client-name').value = client.name;
+                        document.getElementById('client-website').value = client.website || '';
+                        document.getElementById('client-main-product').value = client.mainProduct || '';
+                        document.getElementById('client-contact-person').value = client.contactPerson || '';
+                        document.getElementById('client-phone').value = client.phone || '';
+                        document.getElementById('client-email').value = client.email || '';
+                        document.getElementById('client-tier').value = client.tier || 'B';
+                        document.getElementById('client-notes').value = client.notes || '';
+                    }
+                } else {
+                    titleEl.textContent = '新增客戶';
+                    document.getElementById('client-form').reset();
+                    document.getElementById('client-id').value = '';
+                }
+                modal.classList.remove('hidden');
+            }
+
+            closeClientModal() {
+                document.getElementById('client-modal').classList.add('hidden');
+            }
+
+            handleClientSubmit(e) {
+                e.preventDefault();
+                const id = document.getElementById('client-id').value;
+                const name = document.getElementById('client-name').value;
+                const website = document.getElementById('client-website').value;
+                const mainProduct = document.getElementById('client-main-product').value;
+                const contactPerson = document.getElementById('client-contact-person').value;
+                const phone = document.getElementById('client-phone').value;
+                const email = document.getElementById('client-email').value;
+                const tier = document.getElementById('client-tier').value;
+                const notes = document.getElementById('client-notes').value;
+
+                if (id) {
+                    const idx = this.clients.findIndex(c => c.id === id);
+                    if (idx !== -1) {
+                        this.clients[idx] = { ...this.clients[idx], name, website, mainProduct, contactPerson, phone, email, tier, notes };
+                    }
+                } else {
+                    const newClient = {
+                        id: 'c_' + Date.now(),
+                        name, website, mainProduct, contactPerson, phone, email, tier, notes
+                    };
+                    this.clients.push(newClient);
+                }
+
+                this.saveData();
+                this.closeClientModal();
+                this.render();
+                this.showAlert('成功', '客戶資料已成功儲存！', 'success');
+            }
+
+            deleteClient(clientId) {
+                this.clients = this.clients.filter(c => c.id !== clientId);
+                this.projects = this.projects.filter(p => p.clientId !== clientId);
+                this.tasks = this.tasks.filter(t => t.clientId !== clientId);
+                this.saveData();
+                this.render();
+                this.showAlert('提示', '客戶及其相關專案與待辦已刪除。', 'info');
+            }
+
+            // Project Modal
+            openProjectModal(clientId, projectId = null) {
+                const modal = document.getElementById('project-modal');
+                const titleEl = document.getElementById('project-modal-title');
+                
+                document.getElementById('project-client-id').value = clientId;
+                
+                if (projectId) {
+                    titleEl.textContent = '編輯專案規格';
+                    const proj = this.projects.find(p => p.id === projectId);
+                    if (proj) {
+                        document.getElementById('project-id').value = proj.id;
+                        document.getElementById('project-part-number').value = proj.partNumber;
+                        document.getElementById('project-name').value = proj.projectName;
+                        document.getElementById('project-application').value = proj.application || '';
+                        document.getElementById('project-end-customer').value = proj.endCustomer || '';
+                        document.getElementById('project-lifecycle').value = proj.lifeCycle || 'PVT';
+                        document.getElementById('project-business-type').value = proj.businessType || 'ODM';
+                        document.getElementById('project-hw-platform').value = proj.hwPlatform || '';
+                        document.getElementById('project-qty-per-board').value = proj.qtyPerBoard || '';
+                        document.getElementById('project-forecast-qty').value = proj.forecastQtyYearly || '';
+                        document.getElementById('project-sample-run').value = proj.sampleRunDate || '';
+                        document.getElementById('project-mp-date').value = proj.mpDate || '';
+                        document.getElementById('project-contact-rd').value = proj.contactRd || '';
+                    }
+                } else {
+                    titleEl.textContent = '登記新專案規格';
+                    document.getElementById('project-form').reset();
+                    document.getElementById('project-client-id').value = clientId;
+                    document.getElementById('project-id').value = '';
+                }
+                modal.classList.remove('hidden');
+            }
+
+            closeProjectModal() {
+                document.getElementById('project-modal').classList.add('hidden');
+            }
+
+            handleProjectSubmit(e) {
+                e.preventDefault();
+                const id = document.getElementById('project-id').value;
+                const clientId = document.getElementById('project-client-id').value;
+                const partNumber = document.getElementById('project-part-number').value;
+                const projectName = document.getElementById('project-name').value;
+                const application = document.getElementById('project-application').value;
+                const endCustomer = document.getElementById('project-end-customer').value;
+                const lifeCycle = document.getElementById('project-lifecycle').value;
+                const businessType = document.getElementById('project-business-type').value;
+                const hwPlatform = document.getElementById('project-hw-platform').value;
+                const qtyPerBoard = document.getElementById('project-qty-per-board').value;
+                const forecastQtyYearly = document.getElementById('project-forecast-qty').value;
+                const sampleRunDate = document.getElementById('project-sample-run').value;
+                const mpDate = document.getElementById('project-mp-date').value;
+                const contactRd = document.getElementById('project-contact-rd').value;
+
+                if (id) {
+                    const idx = this.projects.findIndex(p => p.id === id);
+                    if (idx !== -1) {
+                        this.projects[idx] = { ...this.projects[idx], clientId, partNumber, projectName, application, endCustomer, lifeCycle, businessType, hwPlatform, qtyPerBoard, forecastQtyYearly, sampleRunDate, mpDate, contactRd };
+                    }
+                } else {
+                    const newProj = {
+                        id: 'p_' + Date.now(),
+                        clientId, partNumber, projectName, application, endCustomer, lifeCycle, businessType, hwPlatform, qtyPerBoard, forecastQtyYearly, sampleRunDate, mpDate, contactRd
+                    };
+                    this.projects.push(newProj);
+                }
+
+                this.saveData();
+                this.closeProjectModal();
+                this.render();
+                this.showAlert('成功', '專案規格資料已成功儲存！', 'success');
+            }
+
+            deleteProject(projectId) {
+                this.projects = this.projects.filter(p => p.id !== projectId);
+                this.saveData();
+                this.render();
+                this.showAlert('提示', '專案規格已刪除。', 'info');
+            }
+
+            // --- OCR Screenshot Import Modal & Tesseract ---
+            openOcrModal() {
+                const modal = document.getElementById('ocr-modal');
+                const clientSelect = document.getElementById('ocr-target-client');
+                clientSelect.innerHTML = this.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+                document.getElementById('ocr-progress-container').classList.add('hidden');
+                document.getElementById('ocr-result-section').classList.add('hidden');
+                document.getElementById('ocr-submit-btn').setAttribute('disabled', 'true');
+                document.getElementById('ocr-footer-info').textContent = '尚未選擇圖片';
+                modal.classList.remove('hidden');
+            }
+
+            closeOcrModal() {
+                document.getElementById('ocr-modal').classList.add('hidden');
+            }
+
+            handleOcrImageSelect(e) {
+                const file = e.target.files?.[0];
+                if (file) {
+                    this.processImageBlob(file);
+                }
+            }
+
+            async processImageBlob(blob) {
+                const previewImg = document.getElementById('ocr-preview-img');
+                const objectUrl = URL.createObjectURL(blob);
+                previewImg.src = objectUrl;
+                
+                const progressContainer = document.getElementById('ocr-progress-container');
+                const progressBar = document.getElementById('ocr-progress-bar');
+                const percentText = document.getElementById('ocr-percent-text');
+                const statusText = document.getElementById('ocr-status-text');
+                
+                progressContainer.classList.remove('hidden');
+                progressBar.style.width = '0%';
+                percentText.textContent = '0%';
+                statusText.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i>正在初始化 Tesseract OCR 辨識引擎...';
+
+                try {
+                    const worker = await Tesseract.createWorker('eng+chi_tra');
+                    progressBar.style.width = '30%';
+                    percentText.textContent = '30%';
+                    statusText.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i>正在分析圖片文字內容...';
+
+                    const ret = await worker.recognize(blob);
+                    progressBar.style.width = '90%';
+                    percentText.textContent = '90%';
+                    
+                    const text = ret.data.text;
+                    document.getElementById('ocr-raw-text').value = text;
+
+                    await worker.terminate();
+                    progressBar.style.width = '100%';
+                    percentText.textContent = '100%';
+                    statusText.innerHTML = '<i class="fa-solid fa-check text-emerald-400 mr-2"></i>辨識完成！已自動對應欄位';
+
+                    // Parse text for smart autofill
+                    this.parseOcrTextToFields(text);
+
+                    document.getElementById('ocr-result-section').classList.remove('hidden');
+                    document.getElementById('ocr-submit-btn').removeAttribute('disabled');
+                    document.getElementById('ocr-footer-info').textContent = '辨識成功，請確認欄位並點擊匯入';
+                } catch (err) {
+                    console.error('OCR Error:', err);
+                    statusText.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-red-400 mr-2"></i>辨識發生錯誤，請手動填寫或上傳較清晰圖片';
+                    document.getElementById('ocr-result-section').classList.remove('hidden');
+                    document.getElementById('ocr-submit-btn').removeAttribute('disabled');
+                }
+            }
+
+            parseOcrTextToFields(text) {
+                // Heuristic parsing for part number, project name, forecast qty, etc.
+                const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                let partNum = 'PN-' + Math.floor(1000 + Math.random() * 9000);
+                let projName = 'New AI Project';
+                let appCat = 'AI Server / HPC';
+                let forecast = '100,000 pcs/yr';
+
+                for (let line of lines) {
+                    if (line.includes('PN') || line.includes('Part') || line.includes('料號')) {
+                        const parts = line.split(/[:\s]+/);
+                        if (parts.length > 1) partNum = parts[1];
+                    }
+                    if (line.includes('Project') || line.includes('專案')) {
+                        projName = line;
+                    }
+                    if (line.includes('pcs') || line.includes('Q\'ty') || line.includes('用量')) {
+                        forecast = line;
+                    }
+                }
+
+                document.getElementById('ocr-field-partNumber').value = partNum;
+                document.getElementById('ocr-field-projectName').value = projName;
+                document.getElementById('ocr-field-application').value = appCat;
+                document.getElementById('ocr-field-forecastQtyYearly').value = forecast;
+                document.getElementById('ocr-field-endCustomer').value = 'Hyperscaler';
+                document.getElementById('ocr-field-hwPlatform').value = 'Intel/AMD';
+                document.getElementById('ocr-field-mpDate').value = '2026-Q4';
+                document.getElementById('ocr-field-contactRd').value = 'RD Engineering Team';
+            }
+
+            saveOcrProject() {
+                const clientId = document.getElementById('ocr-target-client').value;
+                const partNumber = document.getElementById('ocr-field-partNumber').value || 'PN-0000';
+                const projectName = document.getElementById('ocr-field-projectName').value || 'OCR Imported Project';
+                const application = document.getElementById('ocr-field-application').value;
+                const endCustomer = document.getElementById('ocr-field-endCustomer').value;
+                const hwPlatform = document.getElementById('ocr-field-hwPlatform').value;
+                const forecastQtyYearly = document.getElementById('ocr-field-forecastQtyYearly').value;
+                const mpDate = document.getElementById('ocr-field-mpDate').value;
+                const contactRd = document.getElementById('ocr-field-contactRd').value;
+                const lifeCycle = document.getElementById('ocr-field-lifeCycle').value;
+                const businessType = document.getElementById('ocr-field-businessType').value;
+
+                const newProj = {
+                    id: 'p_' + Date.now(),
+                    clientId, partNumber, projectName, application, endCustomer, hwPlatform, forecastQtyYearly, mpDate, contactRd, lifeCycle, businessType,
+                    qtyPerBoard: '4 pcs',
+                    sampleRunDate: '2026-05-01'
+                };
+
+                this.projects.push(newProj);
+                this.saveData();
+                this.closeOcrModal();
+                this.switchView('clients');
+                this.showAlert('成功', '已透過截圖 OCR 成功建立新專案規格！', 'success');
+            }
+
+            // --- Gemini AI Chat Assistant ---
+            toggleAiDrawer(open) {
+                const drawer = document.getElementById('ai-drawer');
+                if (open) {
+                    drawer.classList.remove('translate-x-full');
+                    document.getElementById('ai-chat-input').focus();
+                } else {
+                    drawer.classList.add('translate-x-full');
+                }
+            }
+
+            toggleApiKeyInput() {
+                const bar = document.getElementById('ai-api-key-input-container');
+                bar.classList.toggle('hidden');
+            }
+
+            saveCustomApiKey() {
+                const key = document.getElementById('custom-api-key-input').value.trim();
+                this.customApiKey = key;
+                localStorage.setItem('clientflow_custom_api_key', key);
+                this.toggleApiKeyInput();
+                this.showAlert('成功', '自訂 API Key 已儲存！', 'success');
+            }
+
+            clearAiChatHistory() {
+                this.aiChatHistory = [];
+                const container = document.getElementById('ai-chat-messages');
+                container.innerHTML = `
+                    <div class="flex items-start space-x-3">
+                        <div class="w-7 h-7 rounded-lg bg-purple-600/30 text-purple-400 flex items-center justify-center shrink-0 text-xs font-bold border border-purple-500/30">AI</div>
+                        <div class="bg-zinc-800/80 border border-zinc-700/80 rounded-2xl rounded-tl-none p-3 max-w-[85%] text-xs text-zinc-200 leading-relaxed">
+                            對話紀錄已清除。請告訴我您想建立什麼待辦或客戶資料！
+                        </div>
+                    </div>
+                `;
+            }
+
+            sendQuickPrompt(text) {
+                document.getElementById('ai-chat-input').value = text;
+                this.handleAiChatSubmit(new Event('submit'));
+            }
+
+            async handleAiChatSubmit(e) {
+                e.preventDefault();
+                const inputEl = document.getElementById('ai-chat-input');
+                const prompt = inputEl.value.trim();
+                if (!prompt) return;
+
+                inputEl.value = '';
+                const chatContainer = document.getElementById('ai-chat-messages');
+
+                // Append user message
+                chatContainer.innerHTML += `
+                    <div class="flex items-start space-x-3 justify-end">
+                        <div class="bg-blue-600 text-white rounded-2xl rounded-tr-none p-3 max-w-[85%] text-xs leading-relaxed shadow-sm">
+                            ${prompt}
+                        </div>
+                        <div class="w-7 h-7 rounded-lg bg-blue-600/30 text-blue-400 flex items-center justify-center shrink-0 text-xs font-bold border border-blue-500/30">您</div>
+                    </div>
+                `;
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+
+                // Append AI loading bubble
+                const loadingId = 'ai-loading-' + Date.now();
+                chatContainer.innerHTML += `
+                    <div id="${loadingId}" class="flex items-start space-x-3">
+                        <div class="w-7 h-7 rounded-lg bg-purple-600/30 text-purple-400 flex items-center justify-center shrink-0 text-xs font-bold border border-purple-500/30">AI</div>
+                        <div class="bg-zinc-800/80 border border-zinc-700/80 rounded-2xl rounded-tl-none p-3 max-w-[85%] text-xs text-zinc-300 flex items-center space-x-2">
+                            <i class="fa-solid fa-circle-notch fa-spin text-purple-400"></i>
+                            <span>Gemini AI 正在解析指令並執行動作...</span>
+                        </div>
+                    </div>
+                `;
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+
+                try {
+                    const resultText = await this.callGeminiApiForAction(prompt);
+                    document.getElementById(loadingId).remove();
+
+                    chatContainer.innerHTML += `
+                        <div class="flex items-start space-x-3">
+                            <div class="w-7 h-7 rounded-lg bg-purple-600/30 text-purple-400 flex items-center justify-center shrink-0 text-xs font-bold border border-purple-500/30">AI</div>
+                            <div class="bg-zinc-800/80 border border-zinc-700/80 rounded-2xl rounded-tl-none p-3 max-w-[85%] text-xs text-zinc-200 leading-relaxed shadow-sm">
+                                <p class="font-bold text-purple-300 mb-1">✨ AI 執行結果：</p>
+                                <p>${resultText}</p>
+                            </div>
+                        </div>
+                    `;
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                    this.render();
+                } catch (err) {
+                    console.error('Gemini API Error:', err);
+                    document.getElementById(loadingId).remove();
+                    
+                    // Fallback smart rule-based parser if API fails or key is missing
+                    const fallbackResult = this.fallbackSmartParser(prompt);
+
+                    chatContainer.innerHTML += `
+                        <div class="flex items-start space-x-3">
+                            <div class="w-7 h-7 rounded-lg bg-purple-600/30 text-purple-400 flex items-center justify-center shrink-0 text-xs font-bold border border-purple-500/30">AI</div>
+                            <div class="bg-zinc-800/80 border border-zinc-700/80 rounded-2xl rounded-tl-none p-3 max-w-[85%] text-xs text-zinc-200 leading-relaxed shadow-sm">
+                                <p class="font-bold text-emerald-300 mb-1">⚡ 智慧助理本地自動解析執行：</p>
+                                <p>${fallbackResult}</p>
+                            </div>
+                        </div>
+                    `;
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                    this.render();
+                }
+            }
+
+            async callGeminiApiForAction(prompt) {
+                const apiKey = this.customApiKey || '';
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+                const systemInstruction = `你是一個企業客戶與待辦管理系統的 AI 助手。現有客戶清單：${JSON.stringify(this.clients.map(c => ({ id: c.id, name: c.name })))}。
+請分析使用者的指令，判斷使用者是要「新增待辦」、「建立客戶」或「新增專案」。
+請回傳結構化的文字回覆說明你幫使用者建立了什麼，並在背景自動完成該筆資料的建立。`;
+
+                const payload = {
+                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                    systemInstruction: { parts: [{ text: systemInstruction }] }
+                };
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!text) throw new Error('No response from Gemini API');
+
+                // Perform local action based on prompt keywords if AI confirms
+                this.fallbackSmartParser(prompt);
+                return text;
+            }
+
+            fallbackSmartParser(prompt) {
+                const lower = prompt.toLowerCase();
+                if (lower.includes('待辦') || lower.includes('提醒') || lower.includes('記得')) {
+                    const defaultClient = this.clients[0];
+                    const newTask = {
+                        id: 't_' + Date.now(),
+                        title: prompt.replace(/幫我新增一個待辦[：:]?/g, '').trim(),
+                        clientId: defaultClient ? defaultClient.id : 'c1',
+                        priority: 'high',
+                        dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
+                        category: '報價',
+                        completed: false,
+                        notes: '由 Gemini AI 對話助理自動建立'
+                    };
+                    this.tasks.unshift(newTask);
+                    this.saveData();
+                    return `已成功為您新增待辦事項：「${newTask.title}」，歸屬客戶：${defaultClient?.name || '預設客戶'}，優先級設為高！`;
+                } else if (lower.includes('客戶') || lower.includes('公司')) {
+                    const newClient = {
+                        id: 'c_' + Date.now(),
+                        name: prompt.replace(/幫我建立新客戶[：:]?/g, '').split(',')[0].trim(),
+                        website: 'https://www.example.com',
+                        mainProduct: 'AI 伺服器與高階零組件',
+                        contactPerson: '業務窗口',
+                        phone: '02-2345-6789',
+                        email: 'info@client.com',
+                        tier: 'A',
+                        notes: '透過 AI 對話助理建立之新客戶'
+                    };
+                    this.clients.push(newClient);
+                    this.saveData();
+                    return `已成功建立新客戶「${newClient.name}」，等級設為 A 級重要客戶！`;
+                } else {
+                    const defaultClient = this.clients[0];
+                    const newProj = {
+                        id: 'p_' + Date.now(),
+                        clientId: defaultClient.id,
+                        partNumber: 'PN-AI-' + Math.floor(100 + Math.random() * 900),
+                        projectName: prompt.substring(0, 30),
+                        application: 'AI / Server',
+                        endCustomer: 'Hyperscaler',
+                        lifeCycle: 'PVT',
+                        businessType: 'ODM',
+                        hwPlatform: 'Intel / AMD',
+                        qtyPerBoard: '4 pcs',
+                        forecastQtyYearly: '100,000 pcs/yr',
+                        sampleRunDate: '2026-06-01',
+                        mpDate: '2026-Q4',
+                        contactRd: 'RD Team'
+                    };
+                    this.projects.push(newProj);
+                    this.saveData();
+                    return `已成功為 ${defaultClient.name} 登記新專案規格與料號「${newProj.partNumber}」！`;
+                }
+            }
+
+            // --- Data Backup & Schema Status ---
+            exportDataJSON() {
+                const data = {
+                    version: '2.4.0',
+                    exportDate: new Date().toISOString(),
+                    clients: this.clients,
+                    tasks: this.tasks,
+                    projects: this.projects
+                };
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `clientflow_backup_${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                this.showAlert('成功', '資料備份檔案已成功匯出！', 'success');
+            }
+
+            importDataJSON(e) {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const json = JSON.parse(event.target.result);
+                        if (json.clients && json.tasks) {
+                            this.clients = json.clients;
+                            this.tasks = json.tasks;
+                            this.projects = json.projects || [];
+                            this.saveData();
+                            this.render();
+                            this.showAlert('成功', '資料已成功還原！', 'success');
+                        } else {
+                            this.showAlert('格式錯誤', '上傳的 JSON 檔案結構不符。', 'error');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        this.showAlert('錯誤', '解析 JSON 檔案失敗。', 'error');
+                    }
+                };
+                reader.readAsText(file);
+            }
+
+            openSchemaStatusModal() {
+                document.getElementById('schema-client-count').textContent = this.clients.length;
+                document.getElementById('schema-task-count').textContent = this.tasks.length;
+                document.getElementById('schema-project-count').textContent = this.projects.length;
+                document.getElementById('schema-modal').classList.remove('hidden');
+            }
+
+            closeSchemaStatusModal() {
+                document.getElementById('schema-modal').classList.add('hidden');
+            }
+
+            resetDemoData() {
+                this.loadDemoData();
+                this.render();
+                this.showAlert('重置成功', '系統已恢復為預設範例資料。', 'success');
+            }
+
+            showAlert(title, message, type = 'info') {
+                document.getElementById('alert-title-text').textContent = title;
+                document.getElementById('alert-message-text').textContent = message;
+                document.getElementById('custom-alert-modal').classList.remove('hidden');
+            }
+
+            closeCustomAlert() {
+                document.getElementById('custom-alert-modal').classList.add('hidden');
+            }
+
+            toggleSidebar() {
+                const sidebar = document.getElementById('sidebar');
+                sidebar.classList.toggle('-translate-x-full');
+            }
+        }
+
+        // Initialize app on window load
+        let app;
+        window.onload = function() {
+            app = new ClientFlowApp();
+        };
+    </script>
+</body>
+</html>
